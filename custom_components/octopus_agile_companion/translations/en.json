@@ -1,0 +1,26 @@
+{
+    "title": "Octopus Agile Companion",
+    "config": {
+      "step": {
+        "user": {
+          "title": "Set up Octopus Agile Companion",
+          "description": "Enter your Octopus API details and tariff code."
+        },
+        "options": {
+          "description": "Configure your consecutive periods in minutes (e.g., '30,60,120'). They should align with 30-minute slots for best results."
+        }
+      },
+      "error": {
+        "api_key_missing": "API Key is required.",
+        "tariff_code_missing": "Tariff Code is required."
+      }
+    },
+    "options": {
+      "step": {
+        "init": {
+          "title": "Options for Octopus Agile Companion"
+        }
+      }
+    }
+  }
+  
