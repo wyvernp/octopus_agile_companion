@@ -1,7 +1,7 @@
 import voluptuous as vol
 from homeassistant import config_entries
 from .const import (
-    DOMAIN, CONF_API_KEY, CONF_TARIFF_CODE,
+    DOMAIN, CONF_API_KEY, CONF_PRODUCT_CODE, CONF_TARIFF_CODE,
     CONF_CONSECUTIVE_PERIODS,
     CONF_FETCH_WINDOW_START, CONF_FETCH_WINDOW_END,
     DEFAULT_FETCH_WINDOW_START, DEFAULT_FETCH_WINDOW_END,
@@ -25,6 +25,8 @@ class OctopusAgileCompanionFlowHandler(config_entries.ConfigFlow, domain=DOMAIN)
         if user_input is not None:
             if not user_input[CONF_API_KEY].strip():
                 errors["base"] = "api_key_missing"
+            if not user_input[CONF_PRODUCT_CODE].strip():
+                errors["base"] = errors.get("base") or "product_code_missing"
             if not user_input[CONF_TARIFF_CODE].strip():
                 errors["base"] = errors.get("base") or "tariff_code_missing"
 
@@ -36,7 +38,8 @@ class OctopusAgileCompanionFlowHandler(config_entries.ConfigFlow, domain=DOMAIN)
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_API_KEY): str,
-                    vol.Required(CONF_TARIFF_CODE): str,
+                    vol.Required(CONF_PRODUCT_CODE, default="AGILE-18-02-21"): str,
+                    vol.Required(CONF_TARIFF_CODE, default="E-1R-AGILE-18-02-21-J"): str,
                     vol.Optional(CONF_FETCH_WINDOW_START, default=DEFAULT_FETCH_WINDOW_START): str,
                     vol.Optional(CONF_FETCH_WINDOW_END, default=DEFAULT_FETCH_WINDOW_END): str,
                 }
@@ -61,6 +64,6 @@ class OctopusAgileCompanionFlowHandler(config_entries.ConfigFlow, domain=DOMAIN)
                 }
             ),
             description_placeholders={
-                "info": "Enter comma-separated periods in minutes (e.g., '30,60,120'). Each should align with 30-min slots."
+                "info": "Enter comma-separated periods in minutes (e.g., '30,60,120'). Ideally align with 30-min slots."
             }
         )

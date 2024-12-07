@@ -7,13 +7,14 @@ _LOGGER = logging.getLogger(__name__)
 class OctopusAgileAPI:
     """Wrapper for the Octopus Agile API calls."""
 
-    def __init__(self, api_key, tariff_code):
+    def __init__(self, api_key, product_code, tariff_code):
         self.api_key = api_key
+        self.product_code = product_code
         self.tariff_code = tariff_code
 
     async def fetch_rates(self, session):
-        """Fetch the standard unit rates for the given tariff code."""
-        url = f"https://api.octopus.energy/v1/electricity-tariffs/{self.tariff_code}/standard-unit-rates/"
+        # Construct URL based on product and tariff codes
+        url = f"https://api.octopus.energy/v1/products/{self.product_code}/electricity-tariffs/{self.tariff_code}/rates/"
         auth = aiohttp.BasicAuth(login=self.api_key, password='')
 
         try:

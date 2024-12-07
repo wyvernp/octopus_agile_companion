@@ -9,6 +9,8 @@ _LOGGER = logging.getLogger(__name__)
 LONDON_TZ = ZoneInfo("Europe/London")
 
 class OctopusAgileCoordinator(DataUpdateCoordinator):
+    """Coordinator that fetches and stores Octopus Agile rates by local date."""
+
     def __init__(self, hass, api, fetch_window_start, fetch_window_end):
         super().__init__(
             hass,
@@ -34,7 +36,7 @@ class OctopusAgileCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         now_local = datetime.now(LONDON_TZ).time()
-        # If we have no data or are within the fetch window, fetch data
+        # Fetch if no data or within the fetch window
         if not self.rates_by_date or (self.fetch_window_start <= now_local <= self.fetch_window_end):
             try:
                 async with async_timeout.timeout(30):
@@ -55,23 +57,20 @@ class OctopusAgileCoordinator(DataUpdateCoordinator):
                             "value_inc_vat": r["value_inc_vat"]
                         })
 
-                    # Sort and check completeness
                     for d in new_rates_by_date:
                         new_rates_by_date[d].sort(key=lambda x: x["valid_from"])
                         slot_count = len(new_rates_by_date[d])
                         if slot_count < EXPECTED_SLOTS_PER_DAY:
                             _LOGGER.warning(
-                                "Data for %s is incomplete (%d slots). Will try again if within fetch window.",
+                                "Data for %s is incomplete (%d slots). Will rely on future updates within fetch window.",
                                 d, slot_count
                             )
 
-                    # Merge new data with existing data
-                    self.rates_by_date = new_rates_by_date if new_rates_by_date else self.rates_by_date
-                    if not self.rates_by_date:
-                        _LOGGER.warning("No rates fetched at all.")
-                    else:
+                    if new_rates_by_date:
+                        self.rates_by_date = new_rates_by_date
                         _LOGGER.debug("Fetched rates for dates: %s", list(self.rates_by_date.keys()))
-
+                    else:
+                        _LOGGER.warning("No rates fetched at all. Keeping old data if any.")
                     return self.rates_by_date
             except Exception as err:
                 _LOGGER.error("Error updating data: %s", err)
