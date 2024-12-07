@@ -5,7 +5,7 @@ from aiohttp.client_exceptions import ClientError
 _LOGGER = logging.getLogger(__name__)
 
 class OctopusAgileAPI:
-    """Wrapper for the Octopus Agile API calls."""
+    """Wrapper for Octopus Agile API calls using Bearer token."""
 
     def __init__(self, api_key, product_code, tariff_code):
         self.api_key = api_key
@@ -13,12 +13,13 @@ class OctopusAgileAPI:
         self.tariff_code = tariff_code
 
     async def fetch_rates(self, session):
-        # Construct URL based on product and tariff codes
-        url = f"https://api.octopus.energy/v1/products/{self.product_code}/electricity-tariffs/{self.tariff_code}/rates/"
-        auth = aiohttp.BasicAuth(login=self.api_key, password='')
+        url = f"https://api.octopus.energy/v1/products/{self.product_code}/electricity-tariffs/{self.tariff_code}/standard-unit-rates/"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
 
         try:
-            async with session.get(url, auth=auth) as resp:
+            async with session.get(url, headers=headers) as resp:
                 resp.raise_for_status()
                 data = await resp.json()
                 results = data.get("results", [])
