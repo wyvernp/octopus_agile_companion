@@ -1,6 +1,7 @@
 DOMAIN = "octopus_agile_companion"
 CONF_API_KEY = "api_key"
 CONF_TARIFF_CODE = "tariff_code"
+CONF_PRODUCT_CODE = "product_code"
 CONF_CONSECUTIVE_PERIODS = "consecutive_periods"
 CONF_FETCH_WINDOW_START = "fetch_window_start"
 CONF_FETCH_WINDOW_END = "fetch_window_end"
