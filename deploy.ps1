@@ -106,10 +106,10 @@ switch ($BumpType) {
 if ($BumpType -ne 'none') {
     Write-Info "New version: $NewVersion"
     
-    # Update manifest.json - use regex to preserve formatting
+    # Update manifest.json - use regex to preserve formatting, write without BOM
     $ManifestContent = Get-Content $ManifestPath -Raw
     $ManifestContent = $ManifestContent -replace '"version":\s*"[^"]*"', "`"version`": `"$NewVersion`""
-    $ManifestContent | Set-Content $ManifestPath -Encoding UTF8 -NoNewline
+    [System.IO.File]::WriteAllText($ManifestPath, $ManifestContent.Trim(), [System.Text.UTF8Encoding]::new($false))
     Write-Success "Updated manifest.json"
 }
 
