@@ -1,0 +1,85 @@
+# Service descriptions for Octopus Agile Companion
+
+get_rates:
+  name: Get rates
+  description: Get electricity rates for a specific date.
+  fields:
+    date:
+      name: Date
+      description: The date to get rates for (YYYY-MM-DD format). Defaults to today.
+      required: false
+      example: "2025-12-25"
+      selector:
+        date:
+    entry_id:
+      name: Entry ID
+      description: The config entry ID (only needed if you have multiple instances).
+      required: false
+      advanced: true
+      selector:
+        text:
+
+get_cheapest_slots:
+  name: Get cheapest slots
+  description: Find the cheapest time slots for a given date.
+  fields:
+    num_slots:
+      name: Number of slots
+      description: How many 30-minute slots to return.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 48
+          mode: box
+    consecutive:
+      name: Consecutive
+      description: If true, find the cheapest consecutive window. If false, find the N cheapest individual slots.
+      required: false
+      default: false
+      selector:
+        boolean:
+    date:
+      name: Date
+      description: The date to search (YYYY-MM-DD format). Defaults to today.
+      required: false
+      example: "2025-12-25"
+      selector:
+        date:
+    entry_id:
+      name: Entry ID
+      description: The config entry ID (only needed if you have multiple instances).
+      required: false
+      advanced: true
+      selector:
+        text:
+
+get_expensive_slots:
+  name: Get most expensive slots
+  description: Find the most expensive time slots for a given date.
+  fields:
+    num_slots:
+      name: Number of slots
+      description: How many 30-minute slots to return.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 48
+          mode: box
+    date:
+      name: Date
+      description: The date to search (YYYY-MM-DD format). Defaults to today.
+      required: false
+      example: "2025-12-25"
+      selector:
+        date:
+    entry_id:
+      name: Entry ID
+      description: The config entry ID (only needed if you have multiple instances).
+      required: false
+      advanced: true
+      selector:
+        text:

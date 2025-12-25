@@ -1,26 +1,118 @@
 {
-    "title": "Octopus Agile Companion",
-    "config": {
-      "step": {
-        "user": {
-          "title": "Set up Octopus Agile Companion",
-          "description": "Enter your Octopus API details and tariff code."
+  "title": "Octopus Agile Companion",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Octopus Agile Companion",
+        "description": "Enter your Octopus Energy API key and tariff details. You can find these in your Octopus Energy dashboard under Developer settings.",
+        "data": {
+          "api_key": "API Key",
+          "product_code": "Product Code",
+          "tariff_code": "Tariff Code",
+          "fetch_window_start": "Fetch Window Start (HH:MM)",
+          "fetch_window_end": "Fetch Window End (HH:MM)"
         },
-        "options": {
-          "description": "Configure your consecutive periods in minutes (e.g., '30,60,120'). They should align with 30-minute slots for best results."
+        "data_description": {
+          "api_key": "Your Octopus Energy API key from the developer dashboard",
+          "product_code": "The Agile product code (e.g., AGILE-24-10-01)",
+          "tariff_code": "Your specific tariff code (e.g., E-1R-AGILE-24-10-01-A)",
+          "fetch_window_start": "Start of window when tomorrow's rates are fetched (usually 16:00)",
+          "fetch_window_end": "End of fetch window (usually 20:00)"
         }
-      },
-      "error": {
-        "api_key_missing": "API Key is required.",
-        "tariff_code_missing": "Tariff Code is required."
       }
     },
-    "options": {
-      "step": {
-        "init": {
-          "title": "Options for Octopus Agile Companion"
+    "error": {
+      "api_key_missing": "API Key is required.",
+      "product_code_missing": "Product Code is required.",
+      "tariff_code_missing": "Tariff Code is required.",
+      "cannot_connect": "Failed to connect to Octopus Energy API.",
+      "invalid_auth": "Invalid API key.",
+      "unknown": "Unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This tariff is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Octopus Agile Companion Options",
+        "description": "Configure your preferences for rate monitoring and alerts.",
+        "data": {
+          "consecutive_periods": "Consecutive Periods (minutes)",
+          "fetch_window_start": "Fetch Window Start",
+          "fetch_window_end": "Fetch Window End",
+          "cheap_threshold": "Cheap Rate Threshold (p/kWh)",
+          "expensive_threshold": "Expensive Rate Threshold (p/kWh)"
+        },
+        "data_description": {
+          "consecutive_periods": "Comma-separated list of periods to track cheapest windows for (e.g., 30,60,120,180)",
+          "cheap_threshold": "Rates below this are considered cheap - triggers binary sensor",
+          "expensive_threshold": "Rates above this are considered expensive - triggers binary sensor"
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "current_rate": {
+        "name": "Current rate"
+      },
+      "next_rate": {
+        "name": "Next rate"
+      },
+      "today_average": {
+        "name": "Today average rate"
+      },
+      "today_min": {
+        "name": "Today minimum rate"
+      },
+      "today_max": {
+        "name": "Today maximum rate"
+      },
+      "tomorrow_average": {
+        "name": "Tomorrow average rate"
+      }
+    },
+    "binary_sensor": {
+      "negative_today": {
+        "name": "Today has negative pricing"
+      },
+      "negative_tomorrow": {
+        "name": "Tomorrow has negative pricing"
+      },
+      "currently_negative": {
+        "name": "Currently negative rate"
+      },
+      "currently_cheap": {
+        "name": "Currently cheap rate"
+      },
+      "currently_expensive": {
+        "name": "Currently expensive rate"
+      }
+    },
+    "number": {
+      "cheap_threshold": {
+        "name": "Cheap rate threshold"
+      },
+      "expensive_threshold": {
+        "name": "Expensive rate threshold"
+      }
+    }
+  },
+  "services": {
+    "get_rates": {
+      "name": "Get rates",
+      "description": "Retrieve electricity rates for a specific date."
+    },
+    "get_cheapest_slots": {
+      "name": "Get cheapest slots",
+      "description": "Find the cheapest time slots for a given date."
+    },
+    "get_expensive_slots": {
+      "name": "Get most expensive slots",
+      "description": "Find the most expensive time slots for a given date."
+    }
   }
+}
   

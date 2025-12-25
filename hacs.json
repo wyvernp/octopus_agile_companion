@@ -1,0 +1,8 @@
+{
+  "name": "Octopus Agile Companion",
+  "render_readme": true,
+  "domains": ["sensor", "binary_sensor", "number"],
+  "country": ["GB"],
+  "homeassistant": "2024.1.0",
+  "iot_class": "cloud_polling"
+}

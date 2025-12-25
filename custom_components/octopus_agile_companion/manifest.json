@@ -1,12 +1,19 @@
-{
-  "domain": "octopus_agile_companion",
-  "name": "Octopus Agile Companion",
-  "version": "0.0.7",
-  "documentation": "https://github.com/wyvernp/octopus_agile_companion",
-  "requirements": [],
-  "dependencies": [],
-  "codeowners": ["@wyvernp"],
-  "integration_type": "hub",
-  "config_flow": true,
-  "iot_class": "cloud_polling"
+﻿{
+    "domain":  "octopus_agile_companion",
+    "name":  "Octopus Agile Companion",
+    "version":  "1.1.0",
+    "documentation":  "https://github.com/wyvernp/octopus_agile_companion",
+    "issue_tracker":  "https://github.com/wyvernp/octopus_agile_companion/issues",
+    "requirements":  [
+
+                     ],
+    "dependencies":  [
+
+                     ],
+    "codeowners":  [
+                       "@wyvernp"
+                   ],
+    "integration_type":  "hub",
+    "config_flow":  true,
+    "iot_class":  "cloud_polling"
 }

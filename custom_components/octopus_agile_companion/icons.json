@@ -1,0 +1,44 @@
+{
+  "services": {
+    "get_rates": {
+      "service": "mdi:chart-timeline-variant"
+    },
+    "get_cheapest_slots": {
+      "service": "mdi:clock-check"
+    },
+    "get_expensive_slots": {
+      "service": "mdi:clock-alert"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "current_rate": {
+        "default": "mdi:currency-gbp",
+        "state": {}
+      }
+    },
+    "binary_sensor": {
+      "currently_negative": {
+        "default": "mdi:cash-fast",
+        "state": {
+          "on": "mdi:cash-plus",
+          "off": "mdi:cash"
+        }
+      },
+      "currently_cheap": {
+        "default": "mdi:tag",
+        "state": {
+          "on": "mdi:tag-check",
+          "off": "mdi:tag-outline"
+        }
+      },
+      "currently_expensive": {
+        "default": "mdi:tag",
+        "state": {
+          "on": "mdi:tag-remove",
+          "off": "mdi:tag-outline"
+        }
+      }
+    }
+  }
+}
