@@ -176,6 +176,49 @@ if (-not $NoPush) {
         git push origin master --follow-tags
     }
     Write-Success "Pushed to remote with tags"
+    
+    # Create GitHub Release using gh CLI
+    Write-Host ""
+    Write-Info "Creating GitHub Release..."
+    
+    # Check if gh CLI is available
+    $ghPath = Get-Command gh -ErrorAction SilentlyContinue
+    if ($ghPath) {
+        # Build release notes
+        $ReleaseTitle = "v$NewVersion"
+        $ReleaseNotes = @"
+## What's New in v$NewVersion
+
+$Message
+
+### Installation
+1. Add this repository to HACS as a custom repository
+2. Search for "Octopus Agile Companion" in HACS
+3. Install and restart Home Assistant
+4. Add the integration via Settings > Devices & Services
+
+### Full Changelog
+https://github.com/wyvernp/octopus_agile_companion/compare/v$CurrentVersion...v$NewVersion
+"@
+        
+        # Create the release
+        $ReleaseNotes | gh release create $TagName --title $ReleaseTitle --notes-file -
+        
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "GitHub Release created: $TagName"
+        }
+        else {
+            Write-Warn "Failed to create GitHub release. Create manually at:"
+            Write-Host "  https://github.com/wyvernp/octopus_agile_companion/releases/new?tag=$TagName" -ForegroundColor Blue
+        }
+    }
+    else {
+        Write-Warn "GitHub CLI (gh) not found. Install it for automatic releases:"
+        Write-Host "  winget install GitHub.cli" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Create release manually at:" -ForegroundColor Yellow
+        Write-Host "  https://github.com/wyvernp/octopus_agile_companion/releases/new?tag=$TagName" -ForegroundColor Blue
+    }
 }
 
 Write-Host ""
@@ -184,10 +227,4 @@ Write-Host "              Deployment Complete!                       " -Foregrou
 Write-Host "=========================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Version $NewVersion has been deployed." -ForegroundColor White
-Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  - Create a GitHub Release at:" -ForegroundColor White
-$ReleaseUrl = "https://github.com/wyvernp/octopus_agile_companion/releases/new?tag=$TagName"
-Write-Host "    $ReleaseUrl" -ForegroundColor Blue
-Write-Host "  - HACS will automatically pick up the new version" -ForegroundColor White
 Write-Host ""
