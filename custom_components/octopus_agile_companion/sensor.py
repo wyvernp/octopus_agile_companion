@@ -358,7 +358,6 @@ class TodayCheapestWindowSensor(OctopusAgileBaseSensor):
     """Sensor showing today's cheapest window start time."""
 
     _attr_icon = "mdi:clock-check"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(self, coordinator, entry, consecutive_period: int, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -373,10 +372,14 @@ class TodayCheapestWindowSensor(OctopusAgileBaseSensor):
 
     @property
     def native_value(self):
-        """Return the cheapest window start time."""
+        """Return the cheapest window as a formatted time range."""
         today_local = datetime.now(LONDON_TZ).date()
         start = self.coordinator.find_cheapest_window(today_local, self.consecutive_period)
-        return start if start else None
+        if not start:
+            return None
+        start_local = start.astimezone(LONDON_TZ)
+        end_local = start_local + timedelta(minutes=self.consecutive_period)
+        return f"{start_local.strftime('%H:%M')} - {end_local.strftime('%H:%M')}"
 
     @property
     def extra_state_attributes(self):
@@ -387,9 +390,14 @@ class TodayCheapestWindowSensor(OctopusAgileBaseSensor):
         
         attrs = {"period_minutes": self.consecutive_period}
         if start:
+            start_local = start.astimezone(LONDON_TZ)
             end = start + timedelta(minutes=self.consecutive_period)
+            end_local = end.astimezone(LONDON_TZ)
             now_utc = datetime.now(LONDON_TZ).astimezone(ZoneInfo("UTC"))
-            attrs["end_time"] = end.isoformat()
+            attrs["start_time"] = start_local.strftime("%H:%M")
+            attrs["end_time"] = end_local.strftime("%H:%M")
+            attrs["start_iso"] = start.isoformat()
+            attrs["end_iso"] = end.isoformat()
             attrs["is_active"] = start <= now_utc < end
             attrs["minutes_until"] = max(0, int((start - now_utc).total_seconds() / 60)) if start > now_utc else 0
         if cost is not None:
@@ -401,7 +409,6 @@ class TomorrowCheapestWindowSensor(OctopusAgileBaseSensor):
     """Sensor showing tomorrow's cheapest window start time."""
 
     _attr_icon = "mdi:clock-check-outline"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(self, coordinator, entry, consecutive_period: int, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -416,10 +423,14 @@ class TomorrowCheapestWindowSensor(OctopusAgileBaseSensor):
 
     @property
     def native_value(self):
-        """Return the cheapest window start time."""
+        """Return the cheapest window as a formatted time range."""
         tomorrow_local = datetime.now(LONDON_TZ).date() + timedelta(days=1)
         start = self.coordinator.find_cheapest_window(tomorrow_local, self.consecutive_period)
-        return start if start else None
+        if not start:
+            return None
+        start_local = start.astimezone(LONDON_TZ)
+        end_local = start_local + timedelta(minutes=self.consecutive_period)
+        return f"{start_local.strftime('%H:%M')} - {end_local.strftime('%H:%M')}"
 
     @property
     def extra_state_attributes(self):
@@ -433,7 +444,12 @@ class TomorrowCheapestWindowSensor(OctopusAgileBaseSensor):
             "data_available": start is not None,
         }
         if start:
-            attrs["end_time"] = (start + timedelta(minutes=self.consecutive_period)).isoformat()
+            start_local = start.astimezone(LONDON_TZ)
+            end_local = (start + timedelta(minutes=self.consecutive_period)).astimezone(LONDON_TZ)
+            attrs["start_time"] = start_local.strftime("%H:%M")
+            attrs["end_time"] = end_local.strftime("%H:%M")
+            attrs["start_iso"] = start.isoformat()
+            attrs["end_iso"] = (start + timedelta(minutes=self.consecutive_period)).isoformat()
         if cost is not None:
             attrs["average_rate"] = round(cost, 2)
         return attrs
@@ -725,7 +741,6 @@ class BestTimeForLoadSensor(OctopusAgileBaseSensor):
     """Sensor recommending best time to run appliances."""
 
     _attr_icon = "mdi:washing-machine"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -740,7 +755,7 @@ class BestTimeForLoadSensor(OctopusAgileBaseSensor):
 
     @property
     def native_value(self):
-        """Return best time for a typical 1-hour appliance load."""
+        """Return best time for a typical 2-hour appliance load as formatted time range."""
         today = datetime.now(LONDON_TZ).date()
         tomorrow = today + timedelta(days=1)
         
@@ -762,7 +777,9 @@ class BestTimeForLoadSensor(OctopusAgileBaseSensor):
         if "error" in result:
             return None
         
-        return datetime.fromisoformat(result["recommended_start"])
+        start = datetime.fromisoformat(result["recommended_start"]).astimezone(LONDON_TZ)
+        end = datetime.fromisoformat(result["recommended_end"]).astimezone(LONDON_TZ)
+        return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
 
     @property
     def extra_state_attributes(self):
@@ -786,9 +803,15 @@ class BestTimeForLoadSensor(OctopusAgileBaseSensor):
         if "error" in result:
             return {"error": result["error"]}
         
+        start = datetime.fromisoformat(result["recommended_start"]).astimezone(LONDON_TZ)
+        end = datetime.fromisoformat(result["recommended_end"]).astimezone(LONDON_TZ)
+        
         return {
             "data_available": True,
-            "recommended_end": result["recommended_end"],
+            "start_time": start.strftime("%H:%M"),
+            "end_time": end.strftime("%H:%M"),
+            "start_iso": result["recommended_start"],
+            "end_iso": result["recommended_end"],
             "optimal_rate": result["optimal_rate"],
             "savings_vs_now_pence": result["savings_vs_now_pence"],
             "savings_vs_average_pence": result["savings_vs_average_pence"],
@@ -802,7 +825,6 @@ class BestChargeWindowSensor(OctopusAgileBaseSensor):
     """Sensor showing best window to charge battery/EV."""
 
     _attr_icon = "mdi:battery-charging"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(
         self, coordinator, entry, device_info: DeviceInfo,
@@ -821,7 +843,7 @@ class BestChargeWindowSensor(OctopusAgileBaseSensor):
 
     @property
     def native_value(self):
-        """Return best charge window start time."""
+        """Return best charge window as formatted time range."""
         today = datetime.now(LONDON_TZ).date()
         tomorrow = today + timedelta(days=1)
         
@@ -842,7 +864,9 @@ class BestChargeWindowSensor(OctopusAgileBaseSensor):
             required_kwh=self.battery_capacity,
             charge_rate_kw=3.0
         )
-        return datetime.fromisoformat(result["start_time"])
+        start = datetime.fromisoformat(result["start_time"]).astimezone(LONDON_TZ)
+        end = datetime.fromisoformat(result["end_time"]).astimezone(LONDON_TZ)
+        return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
 
     @property
     def extra_state_attributes(self):
@@ -867,9 +891,14 @@ class BestChargeWindowSensor(OctopusAgileBaseSensor):
             required_kwh=self.battery_capacity,
             charge_rate_kw=3.0
         )
+        start = datetime.fromisoformat(result["start_time"]).astimezone(LONDON_TZ)
+        end = datetime.fromisoformat(result["end_time"]).astimezone(LONDON_TZ)
         return {
             "data_available": True,
-            "end_time": result["end_time"],
+            "start_time": start.strftime("%H:%M"),
+            "end_time": end.strftime("%H:%M"),
+            "start_iso": result["start_time"],
+            "end_iso": result["end_time"],
             "duration_minutes": result["duration_minutes"],
             "total_kwh": result["total_kwh"],
             "average_rate": result["average_rate"],
@@ -1008,7 +1037,6 @@ class GreenestWindowSensor(SensorEntity):
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:leaf"
-    _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_attribution = "Carbon data from National Grid ESO, prices from Octopus Energy"
     _attr_should_poll = True  # Enable polling for non-coordinator sensor
 
@@ -1021,6 +1049,7 @@ class GreenestWindowSensor(SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_greenest_window"
         self._api = CarbonIntensityAPI()
         self._forecast = []
+        self._best_slot = None
 
     @property
     def name(self) -> str:
@@ -1029,7 +1058,7 @@ class GreenestWindowSensor(SensorEntity):
 
     @property
     def native_value(self):
-        """Return the start of the greenest cheap window."""
+        """Return the greenest cheap window as formatted time."""
         if not self._forecast:
             return None
         
@@ -1065,7 +1094,13 @@ class GreenestWindowSensor(SensorEntity):
                     best_score = combined
                     best_slot = slot
         
-        return best_slot["valid_from"] if best_slot else None
+        self._best_slot = best_slot
+        if not best_slot:
+            return None
+        
+        start_local = best_slot["valid_from"].astimezone(LONDON_TZ)
+        end_local = best_slot["valid_to"].astimezone(LONDON_TZ)
+        return f"{start_local.strftime('%H:%M')} - {end_local.strftime('%H:%M')}"
 
     @property
     def extra_state_attributes(self):
