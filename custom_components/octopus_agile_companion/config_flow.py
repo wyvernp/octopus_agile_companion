@@ -8,14 +8,23 @@ from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    BooleanSelector,
 )
 from .const import (
     DOMAIN, CONF_API_KEY, CONF_PRODUCT_CODE, CONF_TARIFF_CODE,
     CONF_CONSECUTIVE_PERIODS,
     CONF_FETCH_WINDOW_START, CONF_FETCH_WINDOW_END,
     CONF_CHEAP_THRESHOLD, CONF_EXPENSIVE_THRESHOLD,
+    CONF_FLAT_RATE_COMPARISON, CONF_USAGE_PROFILE, CONF_DAILY_KWH,
+    CONF_EXPORT_RATE, CONF_BATTERY_CAPACITY, CONF_ENABLE_CARBON,
     DEFAULT_FETCH_WINDOW_START, DEFAULT_FETCH_WINDOW_END,
     DEFAULT_CONSECUTIVE_PERIODS, DEFAULT_CHEAP_THRESHOLD, DEFAULT_EXPENSIVE_THRESHOLD,
+    DEFAULT_FLAT_RATE, DEFAULT_USAGE_PROFILE, DEFAULT_DAILY_KWH,
+    DEFAULT_EXPORT_RATE, DEFAULT_BATTERY_CAPACITY, DEFAULT_ENABLE_CARBON,
+    USAGE_PROFILES,
 )
 
 
@@ -62,6 +71,12 @@ class OctopusAgileCompanionFlowHandler(config_entries.ConfigFlow, domain=DOMAIN)
                         CONF_CONSECUTIVE_PERIODS: DEFAULT_CONSECUTIVE_PERIODS,
                         CONF_CHEAP_THRESHOLD: DEFAULT_CHEAP_THRESHOLD,
                         CONF_EXPENSIVE_THRESHOLD: DEFAULT_EXPENSIVE_THRESHOLD,
+                        CONF_FLAT_RATE_COMPARISON: DEFAULT_FLAT_RATE,
+                        CONF_USAGE_PROFILE: DEFAULT_USAGE_PROFILE,
+                        CONF_DAILY_KWH: DEFAULT_DAILY_KWH,
+                        CONF_EXPORT_RATE: DEFAULT_EXPORT_RATE,
+                        CONF_BATTERY_CAPACITY: DEFAULT_BATTERY_CAPACITY,
+                        CONF_ENABLE_CARBON: DEFAULT_ENABLE_CARBON,
                     },
                 )
 
@@ -94,12 +109,11 @@ class OctopusAgileOptionsFlowHandler(config_entries.OptionsFlow):
         self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
-        """Manage the options."""
+        """Manage the options - page 1: Basic settings."""
         if user_input is not None:
-            # Process consecutive periods from string to list
-            periods = str_to_periods(user_input.get(CONF_CONSECUTIVE_PERIODS, ""))
-            user_input[CONF_CONSECUTIVE_PERIODS] = periods
-            return self.async_create_entry(title="", data=user_input)
+            # Store basic settings and move to analytics page
+            self._basic_options = user_input
+            return await self.async_step_analytics()
 
         current_options = self.config_entry.options
         current_periods = current_options.get(
@@ -159,6 +173,99 @@ class OctopusAgileOptionsFlowHandler(config_entries.OptionsFlow):
                             mode=NumberSelectorMode.BOX,
                         )
                     ),
+                }
+            ),
+        )
+
+    async def async_step_analytics(self, user_input=None):
+        """Manage analytics options - page 2."""
+        if user_input is not None:
+            # Combine with basic options and save
+            periods = str_to_periods(self._basic_options.get(CONF_CONSECUTIVE_PERIODS, ""))
+            self._basic_options[CONF_CONSECUTIVE_PERIODS] = periods
+            
+            final_options = {**self._basic_options, **user_input}
+            return self.async_create_entry(title="", data=final_options)
+
+        current_options = self.config_entry.options
+
+        return self.async_show_form(
+            step_id="analytics",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_USAGE_PROFILE,
+                        default=current_options.get(
+                            CONF_USAGE_PROFILE, DEFAULT_USAGE_PROFILE
+                        ),
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=USAGE_PROFILES,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_DAILY_KWH,
+                        default=current_options.get(
+                            CONF_DAILY_KWH, DEFAULT_DAILY_KWH
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=1,
+                            max=100,
+                            step=0.5,
+                            unit_of_measurement="kWh",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_FLAT_RATE_COMPARISON,
+                        default=current_options.get(
+                            CONF_FLAT_RATE_COMPARISON, DEFAULT_FLAT_RATE
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0,
+                            max=100,
+                            step=0.1,
+                            unit_of_measurement="p/kWh",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_BATTERY_CAPACITY,
+                        default=current_options.get(
+                            CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0,
+                            max=100,
+                            step=0.5,
+                            unit_of_measurement="kWh",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_EXPORT_RATE,
+                        default=current_options.get(
+                            CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0,
+                            max=50,
+                            step=0.1,
+                            unit_of_measurement="p/kWh",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_ENABLE_CARBON,
+                        default=current_options.get(
+                            CONF_ENABLE_CARBON, DEFAULT_ENABLE_CARBON
+                        ),
+                    ): BooleanSelector(),
                 }
             ),
         )

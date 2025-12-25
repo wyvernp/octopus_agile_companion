@@ -50,6 +50,26 @@
           "cheap_threshold": "Rates below this are considered cheap - triggers binary sensor",
           "expensive_threshold": "Rates above this are considered expensive - triggers binary sensor"
         }
+      },
+      "analytics": {
+        "title": "Analytics & Savings Settings",
+        "description": "Configure advanced analytics for savings calculations, usage profiling, and solar/battery optimization.",
+        "data": {
+          "usage_profile": "Usage Profile",
+          "daily_kwh": "Daily Usage (kWh)",
+          "flat_rate_comparison": "Flat Rate for Comparison",
+          "battery_capacity": "Battery Capacity (kWh)",
+          "export_rate": "Solar Export Rate (SEG)",
+          "enable_carbon_tracking": "Enable Carbon Intensity Tracking"
+        },
+        "data_description": {
+          "usage_profile": "Select the profile that best matches your household usage pattern",
+          "daily_kwh": "Your typical daily electricity consumption in kWh",
+          "flat_rate_comparison": "Flat rate tariff to compare savings against (default: Ofgem price cap)",
+          "battery_capacity": "Home battery capacity in kWh (set to 0 if no battery)",
+          "export_rate": "Your SEG export rate in p/kWh for solar optimization",
+          "enable_carbon_tracking": "Enable grid carbon intensity tracking from National Grid"
+        }
       }
     }
   },
@@ -72,6 +92,33 @@
       },
       "tomorrow_average": {
         "name": "Tomorrow average rate"
+      },
+      "estimated_daily_cost": {
+        "name": "Estimated daily cost"
+      },
+      "potential_daily_savings": {
+        "name": "Potential daily savings"
+      },
+      "effective_rate": {
+        "name": "Effective rate"
+      },
+      "optimization_score": {
+        "name": "Usage optimization score"
+      },
+      "best_load_time": {
+        "name": "Best time for appliances"
+      },
+      "best_charge_window": {
+        "name": "Best battery charge window"
+      },
+      "export_arbitrage": {
+        "name": "Battery arbitrage potential"
+      },
+      "carbon_intensity": {
+        "name": "Grid carbon intensity"
+      },
+      "greenest_window": {
+        "name": "Greenest cheap window"
       }
     },
     "binary_sensor": {
@@ -112,6 +159,86 @@
     "get_expensive_slots": {
       "name": "Get most expensive slots",
       "description": "Find the most expensive time slots for a given date."
+    },
+    "estimate_cost": {
+      "name": "Estimate daily cost",
+      "description": "Estimate your daily electricity cost based on usage profile and compare to flat-rate tariffs.",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Date to estimate cost for (YYYY-MM-DD). Defaults to today."
+        },
+        "daily_kwh": {
+          "name": "Daily kWh",
+          "description": "Your daily electricity consumption in kWh."
+        },
+        "usage_profile": {
+          "name": "Usage profile",
+          "description": "Household usage pattern (working_family, home_worker, retired, ev_owner, flat)."
+        },
+        "flat_rate": {
+          "name": "Flat rate",
+          "description": "Flat rate tariff to compare against (p/kWh)."
+        }
+      }
+    },
+    "suggest_load_time": {
+      "name": "Suggest best load time",
+      "description": "Get recommendations for the best time to run appliances based on upcoming rates.",
+      "fields": {
+        "load_kwh": {
+          "name": "Load (kWh)",
+          "description": "Total energy consumption of the appliance in kWh."
+        },
+        "duration_hours": {
+          "name": "Duration (hours)",
+          "description": "How long the appliance runs for."
+        },
+        "preferred_start": {
+          "name": "Earliest hour",
+          "description": "Earliest acceptable start hour (0-23)."
+        },
+        "preferred_end": {
+          "name": "Latest hour",
+          "description": "Latest acceptable completion hour (0-23)."
+        }
+      }
+    },
+    "analyze_export": {
+      "name": "Analyze solar/battery export",
+      "description": "Get recommendations for battery charging and solar export optimization.",
+      "fields": {
+        "date": {
+          "name": "Date",
+          "description": "Date to analyze (YYYY-MM-DD). Defaults to today."
+        },
+        "export_rate": {
+          "name": "Export rate",
+          "description": "Your SEG export rate in p/kWh."
+        },
+        "battery_capacity": {
+          "name": "Battery capacity",
+          "description": "Your home battery capacity in kWh."
+        }
+      }
+    },
+    "get_carbon_intensity": {
+      "name": "Get carbon intensity",
+      "description": "Get current or forecast grid carbon intensity from National Grid.",
+      "fields": {
+        "forecast": {
+          "name": "Forecast",
+          "description": "If true, return forecast data instead of current."
+        },
+        "hours": {
+          "name": "Hours",
+          "description": "Number of hours to forecast (1-48)."
+        },
+        "postcode": {
+          "name": "Postcode",
+          "description": "UK postcode for regional carbon intensity."
+        }
+      }
     }
   }
 }

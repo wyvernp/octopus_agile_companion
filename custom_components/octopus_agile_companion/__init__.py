@@ -8,20 +8,25 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     DOMAIN, CONF_API_KEY, CONF_TARIFF_CODE, CONF_PRODUCT_CODE,
     CONF_CONSECUTIVE_PERIODS, CONF_FETCH_WINDOW_START, CONF_FETCH_WINDOW_END,
     CONF_CHEAP_THRESHOLD, CONF_EXPENSIVE_THRESHOLD,
+    CONF_FLAT_RATE_COMPARISON, CONF_USAGE_PROFILE, CONF_DAILY_KWH,
+    CONF_EXPORT_RATE, CONF_BATTERY_CAPACITY, CONF_ENABLE_CARBON,
     DATA_COORDINATOR, DEFAULT_CONSECUTIVE_PERIODS,
     DEFAULT_CHEAP_THRESHOLD, DEFAULT_EXPENSIVE_THRESHOLD,
+    DEFAULT_FLAT_RATE, DEFAULT_USAGE_PROFILE, DEFAULT_DAILY_KWH,
+    DEFAULT_EXPORT_RATE, DEFAULT_BATTERY_CAPACITY, DEFAULT_ENABLE_CARBON,
 )
 from .coordinator import OctopusAgileCoordinator
 from .api import OctopusAgileAPI
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "binary_sensor", "number"]
+PLATFORMS = ["sensor", "binary_sensor", "number", "analytics_sensor"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
@@ -42,6 +47,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     periods = entry.options.get(CONF_CONSECUTIVE_PERIODS, DEFAULT_CONSECUTIVE_PERIODS)
     cheap_threshold = entry.options.get(CONF_CHEAP_THRESHOLD, DEFAULT_CHEAP_THRESHOLD)
     expensive_threshold = entry.options.get(CONF_EXPENSIVE_THRESHOLD, DEFAULT_EXPENSIVE_THRESHOLD)
+    
+    # Analytics options
+    flat_rate = entry.options.get(CONF_FLAT_RATE_COMPARISON, DEFAULT_FLAT_RATE)
+    usage_profile = entry.options.get(CONF_USAGE_PROFILE, DEFAULT_USAGE_PROFILE)
+    daily_kwh = entry.options.get(CONF_DAILY_KWH, DEFAULT_DAILY_KWH)
+    export_rate = entry.options.get(CONF_EXPORT_RATE, DEFAULT_EXPORT_RATE)
+    battery_capacity = entry.options.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY)
+    enable_carbon = entry.options.get(CONF_ENABLE_CARBON, DEFAULT_ENABLE_CARBON)
 
     # Create device info for all entities to share
     device_info = DeviceInfo(
@@ -64,6 +77,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         CONF_CONSECUTIVE_PERIODS: periods,
         CONF_CHEAP_THRESHOLD: cheap_threshold,
         CONF_EXPENSIVE_THRESHOLD: expensive_threshold,
+        CONF_FLAT_RATE_COMPARISON: flat_rate,
+        CONF_USAGE_PROFILE: usage_profile,
+        CONF_DAILY_KWH: daily_kwh,
+        CONF_EXPORT_RATE: export_rate,
+        CONF_BATTERY_CAPACITY: battery_capacity,
+        CONF_ENABLE_CARBON: enable_carbon,
         "device_info": device_info,
         "tariff_code": tariff_code,
     }
@@ -97,11 +116,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
 async def async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
     """Set up services for the integration."""
     
+    def _get_entry_id(call_data: dict) -> str | None:
+        """Get entry_id from call data or return first available."""
+        if not hass.data.get(DOMAIN):
+            return None
+        return call_data.get("entry_id") or next(iter(hass.data[DOMAIN]), None)
+    
     async def handle_get_rates(call: ServiceCall) -> ServiceResponse:
         """Handle get_rates service call."""
-        entry_id = call.data.get("entry_id") or list(hass.data[DOMAIN].keys())[0]
-        if entry_id not in hass.data[DOMAIN]:
-            return {"error": "Integration not found"}
+        entry_id = _get_entry_id(call.data)
+        if not entry_id or entry_id not in hass.data[DOMAIN]:
+            return {"error": "No integration instances configured"}
         
         coordinator = hass.data[DOMAIN][entry_id][DATA_COORDINATOR]
         date_str = call.data.get("date")
@@ -136,9 +161,9 @@ async def async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
     
     async def handle_get_cheapest_slots(call: ServiceCall) -> ServiceResponse:
         """Handle get_cheapest_slots service call."""
-        entry_id = call.data.get("entry_id") or list(hass.data[DOMAIN].keys())[0]
-        if entry_id not in hass.data[DOMAIN]:
-            return {"error": "Integration not found"}
+        entry_id = _get_entry_id(call.data)
+        if not entry_id or entry_id not in hass.data[DOMAIN]:
+            return {"error": "No integration instances configured"}
         
         coordinator = hass.data[DOMAIN][entry_id][DATA_COORDINATOR]
         num_slots = call.data.get("num_slots", 1)
@@ -196,9 +221,9 @@ async def async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
 
     async def handle_get_expensive_slots(call: ServiceCall) -> ServiceResponse:
         """Handle get_expensive_slots service call."""
-        entry_id = call.data.get("entry_id") or list(hass.data[DOMAIN].keys())[0]
-        if entry_id not in hass.data[DOMAIN]:
-            return {"error": "Integration not found"}
+        entry_id = _get_entry_id(call.data)
+        if not entry_id or entry_id not in hass.data[DOMAIN]:
+            return {"error": "No integration instances configured"}
         
         coordinator = hass.data[DOMAIN][entry_id][DATA_COORDINATOR]
         num_slots = call.data.get("num_slots", 1)
@@ -275,6 +300,233 @@ async def async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
                 vol.Optional("num_slots", default=1): vol.All(
                     vol.Coerce(int), vol.Range(min=1, max=48)
                 ),
+            }),
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    # Analytics services
+    async def handle_estimate_cost(call: ServiceCall) -> ServiceResponse:
+        """Handle estimate_cost service call."""
+        from .analytics import SavingsCalculator, UsagePatternAnalyzer
+        
+        entry_id = _get_entry_id(call.data)
+        if not entry_id or entry_id not in hass.data[DOMAIN]:
+            return {"error": "No integration instances configured"}
+        
+        coordinator = hass.data[DOMAIN][entry_id][DATA_COORDINATOR]
+        daily_kwh = call.data.get("daily_kwh", 10.0)
+        usage_profile = call.data.get("usage_profile", "working_family")
+        flat_rate = call.data.get("flat_rate", 24.50)
+        date_str = call.data.get("date")
+        
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        LONDON_TZ = ZoneInfo("Europe/London")
+        
+        if date_str:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            target_date = datetime.now(LONDON_TZ).date()
+        
+        if target_date not in coordinator.rates_by_date:
+            return {"error": f"No data for date {target_date}"}
+        
+        rates = coordinator.rates_by_date[target_date]
+        calculator = SavingsCalculator(flat_rate)
+        analyzer = UsagePatternAnalyzer(usage_profile)
+        
+        result = calculator.estimate_daily_cost(
+            rates, analyzer.get_profile(), daily_kwh
+        )
+        result["date"] = str(target_date)
+        result["usage_profile"] = usage_profile
+        return result
+
+    async def handle_suggest_load_time(call: ServiceCall) -> ServiceResponse:
+        """Handle suggest_load_time service call."""
+        from .analytics import UsagePatternAnalyzer
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        
+        entry_id = _get_entry_id(call.data)
+        if not entry_id or entry_id not in hass.data[DOMAIN]:
+            return {"error": "No integration instances configured"}
+        
+        coordinator = hass.data[DOMAIN][entry_id][DATA_COORDINATOR]
+        load_kwh = call.data.get("load_kwh", 1.0)
+        duration_hours = call.data.get("duration_hours", 1.0)
+        preferred_start = call.data.get("preferred_start")
+        preferred_end = call.data.get("preferred_end")
+        
+        LONDON_TZ = ZoneInfo("Europe/London")
+        today = datetime.now(LONDON_TZ).date()
+        tomorrow = today + timedelta(days=1)
+        now_utc = datetime.now(LONDON_TZ).astimezone(ZoneInfo("UTC"))
+        
+        # Gather available future rates
+        rates = []
+        for day in [today, tomorrow]:
+            if day in coordinator.rates_by_date:
+                for slot in coordinator.rates_by_date[day]:
+                    if slot["valid_from"] >= now_utc:
+                        rates.append(slot)
+        
+        if not rates:
+            return {"error": "No future rate data available"}
+        
+        analyzer = UsagePatternAnalyzer()
+        result = analyzer.suggest_load_shift(
+            rates, load_kwh, duration_hours, preferred_start, preferred_end
+        )
+        return result
+
+    async def handle_analyze_export(call: ServiceCall) -> ServiceResponse:
+        """Handle analyze_export service call for solar/battery users."""
+        from .analytics import ExportOptimizer
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        
+        entry_id = _get_entry_id(call.data)
+        if not entry_id or entry_id not in hass.data[DOMAIN]:
+            return {"error": "No integration instances configured"}
+        
+        coordinator = hass.data[DOMAIN][entry_id][DATA_COORDINATOR]
+        export_rate = call.data.get("export_rate", 15.0)
+        battery_capacity = call.data.get("battery_capacity", 10.0)
+        date_str = call.data.get("date")
+        
+        LONDON_TZ = ZoneInfo("Europe/London")
+        
+        if date_str:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        else:
+            target_date = datetime.now(LONDON_TZ).date()
+        
+        if target_date not in coordinator.rates_by_date:
+            return {"error": f"No data for date {target_date}"}
+        
+        rates = coordinator.rates_by_date[target_date]
+        optimizer = ExportOptimizer(
+            export_rate=export_rate,
+            battery_capacity_kwh=battery_capacity
+        )
+        
+        result = optimizer.analyze_export_windows(rates)
+        result["date"] = str(target_date)
+        return result
+
+    async def handle_get_carbon_intensity(call: ServiceCall) -> ServiceResponse:
+        """Handle get_carbon_intensity service call."""
+        from .analytics import CarbonIntensityAPI
+        
+        api = CarbonIntensityAPI()
+        session = async_get_clientsession(hass)
+        
+        forecast = call.data.get("forecast", False)
+        hours = call.data.get("hours", 24)
+        postcode = call.data.get("postcode")
+        
+        if postcode:
+            data = await api.fetch_regional(session, postcode)
+            if data:
+                return {
+                    "current": {
+                        "intensity": data.intensity,
+                        "index": data.index,
+                        "from": data.from_time.isoformat(),
+                        "to": data.to_time.isoformat(),
+                    },
+                    "regional": True,
+                    "postcode": postcode,
+                }
+        
+        if forecast:
+            forecast_data = await api.fetch_forecast(session, hours)
+            return {
+                "forecast": [
+                    {
+                        "intensity": d.intensity,
+                        "index": d.index,
+                        "from": d.from_time.isoformat(),
+                        "to": d.to_time.isoformat(),
+                    }
+                    for d in forecast_data
+                ],
+                "count": len(forecast_data),
+            }
+        else:
+            data = await api.fetch_current(session)
+            if data:
+                return {
+                    "current": {
+                        "intensity": data.intensity,
+                        "index": data.index,
+                        "from": data.from_time.isoformat(),
+                        "to": data.to_time.isoformat(),
+                    }
+                }
+            return {"error": "Failed to fetch carbon intensity"}
+
+    # Register analytics services
+    if not hass.services.has_service(DOMAIN, "estimate_cost"):
+        hass.services.async_register(
+            DOMAIN,
+            "estimate_cost",
+            handle_estimate_cost,
+            schema=vol.Schema({
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("date"): cv.string,
+                vol.Optional("daily_kwh", default=10.0): vol.Coerce(float),
+                vol.Optional("usage_profile", default="working_family"): cv.string,
+                vol.Optional("flat_rate", default=24.50): vol.Coerce(float),
+            }),
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, "suggest_load_time"):
+        hass.services.async_register(
+            DOMAIN,
+            "suggest_load_time",
+            handle_suggest_load_time,
+            schema=vol.Schema({
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("load_kwh", default=1.0): vol.Coerce(float),
+                vol.Optional("duration_hours", default=1.0): vol.Coerce(float),
+                vol.Optional("preferred_start"): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=23)
+                ),
+                vol.Optional("preferred_end"): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=23)
+                ),
+            }),
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, "analyze_export"):
+        hass.services.async_register(
+            DOMAIN,
+            "analyze_export",
+            handle_analyze_export,
+            schema=vol.Schema({
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("date"): cv.string,
+                vol.Optional("export_rate", default=15.0): vol.Coerce(float),
+                vol.Optional("battery_capacity", default=10.0): vol.Coerce(float),
+            }),
+            supports_response=SupportsResponse.ONLY,
+        )
+
+    if not hass.services.has_service(DOMAIN, "get_carbon_intensity"):
+        hass.services.async_register(
+            DOMAIN,
+            "get_carbon_intensity",
+            handle_get_carbon_intensity,
+            schema=vol.Schema({
+                vol.Optional("forecast", default=False): cv.boolean,
+                vol.Optional("hours", default=24): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=48)
+                ),
+                vol.Optional("postcode"): cv.string,
             }),
             supports_response=SupportsResponse.ONLY,
         )

@@ -83,3 +83,189 @@ get_expensive_slots:
       advanced: true
       selector:
         text:
+
+# Analytics Services
+
+estimate_cost:
+  name: Estimate daily cost
+  description: Estimate your daily electricity cost based on your usage profile and compare to flat-rate tariffs. Helps you see potential savings from being on Agile.
+  fields:
+    daily_kwh:
+      name: Daily usage (kWh)
+      description: Your typical daily electricity consumption.
+      required: false
+      default: 10.0
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 0.5
+          unit_of_measurement: kWh
+          mode: box
+    usage_profile:
+      name: Usage profile
+      description: Your household usage pattern - affects when energy is consumed throughout the day.
+      required: false
+      default: "working_family"
+      selector:
+        select:
+          options:
+            - label: "Working Family"
+              value: "working_family"
+            - label: "Home Worker"
+              value: "home_worker"
+            - label: "Retired"
+              value: "retired"
+            - label: "EV Owner (overnight charging)"
+              value: "ev_owner"
+            - label: "Flat (even distribution)"
+              value: "flat"
+    flat_rate:
+      name: Comparison flat rate
+      description: The flat-rate tariff to compare against (p/kWh).
+      required: false
+      default: 24.50
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 0.1
+          unit_of_measurement: p/kWh
+          mode: box
+    date:
+      name: Date
+      description: Date to estimate cost for. Defaults to today.
+      required: false
+      selector:
+        date:
+    entry_id:
+      name: Entry ID
+      description: The config entry ID (only needed if you have multiple instances).
+      required: false
+      advanced: true
+      selector:
+        text:
+
+suggest_load_time:
+  name: Suggest best load time
+  description: Get recommendations for the optimal time to run appliances (washing machine, dishwasher, etc.) based on upcoming electricity rates.
+  fields:
+    load_kwh:
+      name: Load energy (kWh)
+      description: Total energy the appliance will consume.
+      required: false
+      default: 1.0
+      selector:
+        number:
+          min: 0.1
+          max: 50
+          step: 0.1
+          unit_of_measurement: kWh
+          mode: box
+    duration_hours:
+      name: Duration (hours)
+      description: How long the appliance cycle takes.
+      required: false
+      default: 1.0
+      selector:
+        number:
+          min: 0.5
+          max: 12
+          step: 0.5
+          unit_of_measurement: hours
+          mode: box
+    preferred_start:
+      name: Earliest hour
+      description: Earliest acceptable start time (0-23). Leave empty for no restriction.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 23
+          mode: box
+    preferred_end:
+      name: Latest hour
+      description: Latest acceptable completion time (0-23). Leave empty for no restriction.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 23
+          mode: box
+    entry_id:
+      name: Entry ID
+      description: The config entry ID (only needed if you have multiple instances).
+      required: false
+      advanced: true
+      selector:
+        text:
+
+analyze_export:
+  name: Analyze solar/battery export
+  description: Get recommendations for battery charging windows and optimal export times for solar/battery users. Analyzes when to charge from grid vs export to grid.
+  fields:
+    export_rate:
+      name: Export rate
+      description: Your Smart Export Guarantee (SEG) rate in p/kWh.
+      required: false
+      default: 15.0
+      selector:
+        number:
+          min: 0
+          max: 50
+          step: 0.1
+          unit_of_measurement: p/kWh
+          mode: box
+    battery_capacity:
+      name: Battery capacity
+      description: Your home battery capacity in kWh.
+      required: false
+      default: 10.0
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 0.5
+          unit_of_measurement: kWh
+          mode: box
+    date:
+      name: Date
+      description: Date to analyze. Defaults to today.
+      required: false
+      selector:
+        date:
+    entry_id:
+      name: Entry ID
+      description: The config entry ID (only needed if you have multiple instances).
+      required: false
+      advanced: true
+      selector:
+        text:
+
+get_carbon_intensity:
+  name: Get carbon intensity
+  description: Get current or forecast grid carbon intensity from National Grid ESO. Useful for eco-friendly scheduling.
+  fields:
+    forecast:
+      name: Get forecast
+      description: If enabled, returns forecast data instead of just current intensity.
+      required: false
+      default: false
+      selector:
+        boolean:
+    hours:
+      name: Forecast hours
+      description: Number of hours to forecast (only used if forecast is enabled).
+      required: false
+      default: 24
+      selector:
+        number:
+          min: 1
+          max: 48
+          mode: box
+    postcode:
+      name: Postcode
+      description: UK postcode for regional carbon intensity (e.g., "SW1A 1AA"). Leave empty for national average.
+      required: false
+      selector:
+        text:

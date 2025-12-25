@@ -8,12 +8,60 @@
     },
     "get_expensive_slots": {
       "service": "mdi:clock-alert"
+    },
+    "estimate_cost": {
+      "service": "mdi:calculator"
+    },
+    "suggest_load_time": {
+      "service": "mdi:washing-machine"
+    },
+    "analyze_export": {
+      "service": "mdi:solar-power"
+    },
+    "get_carbon_intensity": {
+      "service": "mdi:molecule-co2"
     }
   },
   "entity": {
     "sensor": {
       "current_rate": {
         "default": "mdi:currency-gbp",
+        "state": {}
+      },
+      "estimated_daily_cost": {
+        "default": "mdi:currency-gbp",
+        "state": {}
+      },
+      "potential_daily_savings": {
+        "default": "mdi:piggy-bank",
+        "state": {}
+      },
+      "effective_rate": {
+        "default": "mdi:speedometer",
+        "state": {}
+      },
+      "optimization_score": {
+        "default": "mdi:gauge",
+        "state": {}
+      },
+      "best_load_time": {
+        "default": "mdi:washing-machine",
+        "state": {}
+      },
+      "best_charge_window": {
+        "default": "mdi:battery-charging",
+        "state": {}
+      },
+      "export_arbitrage": {
+        "default": "mdi:cash-multiple",
+        "state": {}
+      },
+      "carbon_intensity": {
+        "default": "mdi:molecule-co2",
+        "state": {}
+      },
+      "greenest_window": {
+        "default": "mdi:leaf",
         "state": {}
       }
     },
