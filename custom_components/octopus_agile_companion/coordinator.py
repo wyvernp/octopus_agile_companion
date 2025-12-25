@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, time
 import logging
 import async_timeout
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.core import HomeAssistant
 from zoneinfo import ZoneInfo
 
@@ -61,7 +62,7 @@ class OctopusAgileCoordinator(DataUpdateCoordinator):
         if not self.rates_by_date or (self.fetch_window_start <= now_local <= self.fetch_window_end):
             try:
                 async with async_timeout.timeout(30):
-                    session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+                    session = async_get_clientsession(self.hass)
                     results = await self.api.fetch_rates(session)
 
                     new_rates_by_date = {}
