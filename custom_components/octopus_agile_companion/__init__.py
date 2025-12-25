@@ -26,7 +26,7 @@ from .api import OctopusAgileAPI
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "binary_sensor", "number", "analytics_sensor"]
+PLATFORMS = ["sensor", "binary_sensor", "number"]
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
