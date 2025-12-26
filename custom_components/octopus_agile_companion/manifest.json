@@ -1,7 +1,7 @@
 {
   "domain": "octopus_agile_companion",
   "name": "Octopus Agile Companion",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "documentation": "https://github.com/wyvernp/octopus_agile_companion",
   "issue_tracker": "https://github.com/wyvernp/octopus_agile_companion/issues",
   "requirements": [],

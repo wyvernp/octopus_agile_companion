@@ -7,6 +7,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.event import async_track_time_interval
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -22,6 +23,8 @@ from .const import (
 )
 
 LONDON_TZ = ZoneInfo("Europe/London")
+# Update time-sensitive binary sensors every minute
+SCAN_INTERVAL = timedelta(minutes=1)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -170,6 +173,7 @@ class CurrentlyNegativeBinarySensor(OctopusAgileBinaryBaseSensor):
 
     _attr_icon = "mdi:cash-fast"
     _attr_device_class = BinarySensorDeviceClass.POWER
+    _attr_should_poll = True  # Poll every minute to detect rate changes
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -194,7 +198,7 @@ class CurrentlyNegativeBinarySensor(OctopusAgileBinaryBaseSensor):
             return {}
         return {
             "current_rate": round(current["value_inc_vat"], 2),
-            "valid_until": current["valid_to"].isoformat(),
+            "valid_until": current["valid_to"].astimezone(LONDON_TZ).strftime("%H:%M"),
         }
 
 
@@ -202,6 +206,7 @@ class CurrentlyCheapBinarySensor(OctopusAgileBinaryBaseSensor):
     """Binary sensor indicating if current rate is below the cheap threshold."""
 
     _attr_icon = "mdi:tag-check"
+    _attr_should_poll = True  # Poll every minute to detect rate changes
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo, threshold: float):
         """Initialize the sensor."""
@@ -236,6 +241,7 @@ class CurrentlyExpensiveBinarySensor(OctopusAgileBinaryBaseSensor):
     """Binary sensor indicating if current rate is above the expensive threshold."""
 
     _attr_icon = "mdi:tag-remove"
+    _attr_should_poll = True  # Poll every minute to detect rate changes
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo, threshold: float):
         """Initialize the sensor."""
@@ -270,6 +276,7 @@ class TodayCheapestWindowActiveBinarySensor(OctopusAgileBinaryBaseSensor):
     """Binary sensor that is on during today's cheapest window."""
 
     _attr_icon = "mdi:clock-check"
+    _attr_should_poll = True  # Poll every minute to detect window boundaries
 
     def __init__(self, coordinator, entry, consecutive_period: int, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -291,7 +298,7 @@ class TodayCheapestWindowActiveBinarySensor(OctopusAgileBinaryBaseSensor):
             return False
 
         end = start + timedelta(minutes=self.consecutive_period)
-        now_utc = datetime.now(LONDON_TZ).astimezone(ZoneInfo("UTC"))
+        now_utc = datetime.now(ZoneInfo("UTC"))
         return start <= now_utc < end
 
     @property
@@ -303,10 +310,14 @@ class TodayCheapestWindowActiveBinarySensor(OctopusAgileBinaryBaseSensor):
         
         attrs = {"period_minutes": self.consecutive_period}
         if start:
+            start_local = start.astimezone(LONDON_TZ)
             end = start + timedelta(minutes=self.consecutive_period)
-            now_utc = datetime.now(LONDON_TZ).astimezone(ZoneInfo("UTC"))
-            attrs["window_start"] = start.isoformat()
-            attrs["window_end"] = end.isoformat()
+            end_local = end.astimezone(LONDON_TZ)
+            now_utc = datetime.now(ZoneInfo("UTC"))
+            attrs["window_start"] = start_local.strftime("%H:%M")
+            attrs["window_end"] = end_local.strftime("%H:%M")
+            attrs["window_start_iso"] = start.isoformat()
+            attrs["window_end_iso"] = end.isoformat()
             if start > now_utc:
                 attrs["minutes_until_start"] = int((start - now_utc).total_seconds() / 60)
             elif now_utc < end:
