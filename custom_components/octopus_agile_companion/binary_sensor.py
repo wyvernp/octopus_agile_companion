@@ -7,7 +7,8 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_track_point_in_time
+from homeassistant.util import dt as dt_util
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -23,8 +24,50 @@ from .const import (
 )
 
 LONDON_TZ = ZoneInfo("Europe/London")
-# Update time-sensitive binary sensors every minute
-SCAN_INTERVAL = timedelta(minutes=1)
+UTC = ZoneInfo("UTC")
+
+
+class _TimeBoundaryUpdateMixin:
+    """Mixin that schedules a state write at the next known boundary."""
+
+    _unsub_timer = None
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        self._schedule_next_update()
+
+    async def async_will_remove_from_hass(self):
+        if self._unsub_timer:
+            self._unsub_timer()
+            self._unsub_timer = None
+        await super().async_will_remove_from_hass()
+
+    def _schedule_at(self, when: datetime | None) -> None:
+        if self._unsub_timer:
+            self._unsub_timer()
+            self._unsub_timer = None
+
+        if when is None:
+            return
+
+        when_utc = dt_util.as_utc(when)
+        now_utc = dt_util.utcnow()
+        if when_utc <= now_utc:
+            when_utc = now_utc + timedelta(seconds=1)
+
+        self._unsub_timer = async_track_point_in_time(
+            self.hass,
+            self._handle_boundary,
+            when_utc,
+        )
+
+    async def _handle_boundary(self, _now) -> None:
+        # Recompute state/attributes and schedule the next boundary.
+        self.async_write_ha_state()
+        self._schedule_next_update()
+
+    def _schedule_next_update(self) -> None:
+        raise NotImplementedError
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
@@ -65,6 +108,38 @@ class OctopusAgileBinaryBaseSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self._entry = entry
         self._attr_device_info = device_info
+
+
+class OctopusAgileTimeSensitiveBinarySensor(_TimeBoundaryUpdateMixin, OctopusAgileBinaryBaseSensor):
+    """Base class for time-sensitive binary sensors.
+
+    These sensors don't need constant polling; they schedule their own
+    updates at known time boundaries (typically the next rate slot boundary).
+    """
+
+    def _next_rate_boundary(self) -> datetime | None:
+        current = self.coordinator.get_current_rate()
+        if current:
+            return current["valid_to"]
+
+        next_rate = self.coordinator.get_next_rate()
+        if next_rate:
+            return next_rate["valid_from"]
+
+        return None
+
+    def _schedule_next_update(self) -> None:
+        self._schedule_at(self._next_rate_boundary())
+
+    def async_handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator.
+
+        Reschedule our next boundary whenever fresh rate data arrives, since
+        the next relevant boundary can change (e.g. once tomorrow's rates are
+        available, or if the cheapest window shifts).
+        """
+        super().async_handle_coordinator_update()
+        self._schedule_next_update()
 
 
 class NegativePricingTodayBinarySensor(OctopusAgileBinaryBaseSensor):
@@ -168,12 +243,11 @@ class NegativePricingTomorrowBinarySensor(OctopusAgileBinaryBaseSensor):
         }
 
 
-class CurrentlyNegativeBinarySensor(OctopusAgileBinaryBaseSensor):
+class CurrentlyNegativeBinarySensor(OctopusAgileTimeSensitiveBinarySensor):
     """Binary sensor indicating if current rate is negative (you get paid!)."""
 
     _attr_icon = "mdi:cash-fast"
     _attr_device_class = BinarySensorDeviceClass.POWER
-    _attr_should_poll = True  # Poll every minute to detect rate changes
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -199,14 +273,14 @@ class CurrentlyNegativeBinarySensor(OctopusAgileBinaryBaseSensor):
         return {
             "current_rate": round(current["value_inc_vat"], 2),
             "valid_until": current["valid_to"].astimezone(LONDON_TZ).strftime("%H:%M"),
+            "valid_until_iso": current["valid_to"].isoformat(),
         }
 
 
-class CurrentlyCheapBinarySensor(OctopusAgileBinaryBaseSensor):
+class CurrentlyCheapBinarySensor(OctopusAgileTimeSensitiveBinarySensor):
     """Binary sensor indicating if current rate is below the cheap threshold."""
 
     _attr_icon = "mdi:tag-check"
-    _attr_should_poll = True  # Poll every minute to detect rate changes
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo, threshold: float):
         """Initialize the sensor."""
@@ -237,11 +311,10 @@ class CurrentlyCheapBinarySensor(OctopusAgileBinaryBaseSensor):
         return attrs
 
 
-class CurrentlyExpensiveBinarySensor(OctopusAgileBinaryBaseSensor):
+class CurrentlyExpensiveBinarySensor(OctopusAgileTimeSensitiveBinarySensor):
     """Binary sensor indicating if current rate is above the expensive threshold."""
 
     _attr_icon = "mdi:tag-remove"
-    _attr_should_poll = True  # Poll every minute to detect rate changes
 
     def __init__(self, coordinator, entry, device_info: DeviceInfo, threshold: float):
         """Initialize the sensor."""
@@ -272,11 +345,10 @@ class CurrentlyExpensiveBinarySensor(OctopusAgileBinaryBaseSensor):
         return attrs
 
 
-class TodayCheapestWindowActiveBinarySensor(OctopusAgileBinaryBaseSensor):
+class TodayCheapestWindowActiveBinarySensor(OctopusAgileTimeSensitiveBinarySensor):
     """Binary sensor that is on during today's cheapest window."""
 
     _attr_icon = "mdi:clock-check"
-    _attr_should_poll = True  # Poll every minute to detect window boundaries
 
     def __init__(self, coordinator, entry, consecutive_period: int, device_info: DeviceInfo):
         """Initialize the sensor."""
@@ -298,8 +370,31 @@ class TodayCheapestWindowActiveBinarySensor(OctopusAgileBinaryBaseSensor):
             return False
 
         end = start + timedelta(minutes=self.consecutive_period)
-        now_utc = datetime.now(ZoneInfo("UTC"))
+        now_utc = datetime.now(UTC)
         return start <= now_utc < end
+
+    def _schedule_next_update(self) -> None:
+        """Schedule updates at the next relevant boundary.
+
+        We already know the window start/end; schedule exactly at those times.
+        If the window isn't known yet, fall back to the next rate slot boundary.
+        """
+        today_local = datetime.now(LONDON_TZ).date()
+        start = self.coordinator.find_cheapest_window(today_local, self.consecutive_period)
+        if not start:
+            self._schedule_at(self._next_rate_boundary())
+            return
+
+        end = start + timedelta(minutes=self.consecutive_period)
+        now_utc = datetime.now(UTC)
+
+        if now_utc < start:
+            self._schedule_at(start)
+        elif now_utc < end:
+            self._schedule_at(end)
+        else:
+            # Window is over for today; no further time-driven updates needed.
+            self._schedule_at(None)
 
     @property
     def extra_state_attributes(self):
@@ -313,15 +408,12 @@ class TodayCheapestWindowActiveBinarySensor(OctopusAgileBinaryBaseSensor):
             start_local = start.astimezone(LONDON_TZ)
             end = start + timedelta(minutes=self.consecutive_period)
             end_local = end.astimezone(LONDON_TZ)
-            now_utc = datetime.now(ZoneInfo("UTC"))
+            now_utc = datetime.now(UTC)
             attrs["window_start"] = start_local.strftime("%H:%M")
             attrs["window_end"] = end_local.strftime("%H:%M")
             attrs["window_start_iso"] = start.isoformat()
             attrs["window_end_iso"] = end.isoformat()
-            if start > now_utc:
-                attrs["minutes_until_start"] = int((start - now_utc).total_seconds() / 60)
-            elif now_utc < end:
-                attrs["minutes_remaining"] = int((end - now_utc).total_seconds() / 60)
+            attrs["is_active"] = start <= now_utc < end
         if cost is not None:
             attrs["average_rate"] = round(cost, 2)
         return attrs
